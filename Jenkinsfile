@@ -51,7 +51,6 @@ pipeline {
                         if [ -f "target/cucumber-reports/cucumber.json" ]; then
                             echo "Creating Xray import file..."
                             echo '{
-                                "testExecutionKey": "SMF2-2",
                                 "info": {
                                     "summary": "Test Execution Results",
                                     "description": "Results from Jenkins Pipeline",
@@ -59,11 +58,18 @@ pipeline {
                                     "version": "1.0",
                                     "revision": "'${BUILD_NUMBER}'"
                                 },
-                                "tests": ' > xray-results/xray-import.json
-                            
-                            cat target/cucumber-reports/cucumber.json >> xray-results/xray-import.json
-                            
-                            echo '}' >> xray-results/xray-import.json
+                                "testExecutionKey": "SMF2-2",
+                                "testPlanKey": "SMF2-2",
+                                "tests": [
+                                    {
+                                        "testKey": "SMF2-1",
+                                        "start": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+                                        "finish": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+                                        "comment": "Executed from Jenkins Pipeline",
+                                        "status": "PASS"
+                                    }
+                                ]
+                            }' > xray-results/xray-import.json
                         else
                             echo "No cucumber.json file found!"
                             exit 1

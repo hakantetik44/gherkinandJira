@@ -17,7 +17,7 @@ import org.junit.runner.RunWith;
     },
     monochrome = true,
     dryRun = false,
-    tags = "@test"
+    tags = "@test and @TestKey=SMF2-1"
 )
 public class TestRunner {
 } 
