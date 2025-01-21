@@ -10,10 +10,6 @@ pipeline {
         skipDefaultCheckout(false)
     }
 
-    environment {
-        JIRA_CREDS = credentials('jira-credentials')
-    }
-
     stages {
         stage('Initialize') {
             steps {
@@ -49,22 +45,19 @@ pipeline {
         }
 
         stage('Upload to Xray') {
+            environment {
+                JIRA_CREDS = credentials('jira-credentials')
+            }
             steps {
                 script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'jira-credentials',
-                        usernameVariable: 'JIRA_USER',
-                        passwordVariable: 'JIRA_TOKEN'
-                    )]) {
-                        def auth = "${JIRA_USER}:${JIRA_TOKEN}".bytes.encodeBase64().toString()
-                        def response = httpRequest(
-                            url: 'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber',
-                            httpMode: 'POST',
-                            customHeaders: [[name: 'Authorization', value: "Basic ${auth}"]], 
-                            requestBody: readFile('target/cucumber-reports/cucumber.json')
-                        )
-                        echo "Xray Response: ${response.status}"
-                    }
+                    def auth = "${JIRA_CREDS_USR}:${JIRA_CREDS_PSW}".bytes.encodeBase64().toString()
+                    def response = httpRequest(
+                        url: 'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber',
+                        httpMode: 'POST',
+                        customHeaders: [[name: 'Authorization', value: "Basic ${auth}"]], 
+                        requestBody: readFile('target/cucumber-reports/cucumber.json')
+                    )
+                    echo "Xray Response: ${response.status}"
                 }
             }
         }
@@ -94,25 +87,13 @@ pipeline {
 
     post {
         always {
-            script {
-                node('built-in') {
-                    cleanWs()
-                }
-            }
+            cleanWs()
         }
         success {
-            script {
-                node('built-in') {
-                    echo "✅ Tests completed successfully"
-                }
-            }
+            echo "✅ Tests completed successfully"
         }
         failure {
-            script {
-                node('built-in') {
-                    echo "❌ Tests failed"
-                }
-            }
+            echo "❌ Tests failed"
         }
     }
 } 
