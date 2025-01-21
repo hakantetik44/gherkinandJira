@@ -62,52 +62,61 @@ pipeline {
                         sh """
                             mkdir -p xray-results
                             
-                            echo '{
-                                "info": {
-                                    "summary": "Somfy Web UI Test Execution",
-                                    "description": "Automated test execution for Somfy web UI features",
-                                    "project": {
-                                        "key": "SMF"
+                            # Convert cucumber.json to Xray format
+                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
+                                echo "Creating Xray import file..."
+                                
+                                echo '{
+                                    "info": {
+                                        "summary": "Somfy Web UI Test Execution",
+                                        "description": "Automated test execution for Somfy web UI features",
+                                        "project": {
+                                            "key": "SMF"
+                                        },
+                                        "testPlanKey": "SMF-1",
+                                        "testEnvironments": ["Chrome"]
                                     },
-                                    "testPlanKey": "SMF-1",
-                                    "testEnvironments": ["Chrome"]
-                                },
-                                "tests": [
-                                    {
-                                        "testKey": "SMF-2",
-                                        "comment": "Cookie acceptance and navigation test",
-                                        "status": "PASS",
-                                        "evidence": "Test executed successfully",
-                                        "steps": [
-                                            {
-                                                "status": "PASS",
-                                                "comment": "Navigate to Somfy homepage"
-                                            },
-                                            {
-                                                "status": "PASS",
-                                                "comment": "Accept cookies"
-                                            },
-                                            {
-                                                "status": "PASS",
-                                                "comment": "Navigate to Products page"
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }' > xray-results/xray-import.json
+                                    "tests": [
+                                        {
+                                            "testKey": "SMF-2",
+                                            "comment": "Cookie acceptance and navigation test",
+                                            "status": "PASS",
+                                            "evidence": "Test executed successfully",
+                                            "steps": [
+                                                {
+                                                    "status": "PASS",
+                                                    "comment": "Navigate to Somfy homepage"
+                                                },
+                                                {
+                                                    "status": "PASS",
+                                                    "comment": "Accept cookies"
+                                                },
+                                                {
+                                                    "status": "PASS",
+                                                    "comment": "Navigate to Products page"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }' > xray-results/xray-import.json
 
-                            echo "Using Authorization: Basic ${auth}"
-                            
-                            curl -v -X POST \
-                                 -H "Authorization: Basic ${auth}" \
-                                 -H "Content-Type: application/json" \
-                                 -H "Accept: application/json" \
-                                 --data @xray-results/xray-import.json \
-                                 "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution" 2>&1 | tee xray-response.log
-                            
-                            if [ \$? -ne 0 ]; then
-                                echo "Error: Xray API call failed"
-                                cat xray-response.log
+                                echo "Using Authorization: Basic ${auth}"
+                                
+                                # Import to Xray using multipart endpoint
+                                curl -v -X POST \
+                                     -H "Authorization: Basic ${auth}" \
+                                     -H "Content-Type: multipart/form-data" \
+                                     -F "file=@target/cucumber-reports/cucumber.json" \
+                                     -F "info=@xray-results/xray-import.json" \
+                                     "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber/multipart" 2>&1 | tee xray-response.log
+                                
+                                if [ \$? -ne 0 ]; then
+                                    echo "Error: Xray API call failed"
+                                    cat xray-response.log
+                                    exit 1
+                                fi
+                            else
+                                echo "No cucumber.json file found!"
                                 exit 1
                             fi
                         """
