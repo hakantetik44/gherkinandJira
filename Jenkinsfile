@@ -32,7 +32,7 @@ pipeline {
             }
         }
 
-        stage('Upload to Xray') {
+        stage('Update Xray Test Results') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'jira-api',
@@ -43,35 +43,14 @@ pipeline {
                         echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
                         AUTH=$(cat auth.txt)
                         
-                        # Create test execution
-                        curl -v -X POST \\
-                        -H "Authorization: Basic $AUTH" \\
-                        -H "Content-Type: application/json" \\
-                        --data '{
-                            "fields": {
-                                "project": {
-                                    "key": "SMF2"
-                                },
-                                "summary": "Test Execution - $(date '+%Y-%m-%d %H:%M:%S')",
-                                "description": "Automated test execution",
-                                "issuetype": {
-                                    "name": "Test Execution"
-                                }
-                            }
-                        }' \\
-                        "https://somfycucumber.atlassian.net/rest/api/2/issue" > execution.json
-
-                        # Get execution key
-                        EXECUTION_KEY=$(cat execution.json | grep -o '"key":"[^"]*' | cut -d'"' -f4)
-                        
-                        # Upload test results
+                        # Update test execution results
                         curl -v -X POST \\
                         -H "Authorization: Basic $AUTH" \\
                         -H "Content-Type: application/json" \\
                         --data-binary @target/cucumber-reports/cucumber.json \\
-                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=${EXECUTION_KEY}&testPlanKey=SMF2-2"
+                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber/SMF2-1?testExecKey=SMF2-2"
 
-                        rm auth.txt execution.json
+                        rm auth.txt
                     '''
                 }
             }
