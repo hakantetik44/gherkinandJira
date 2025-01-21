@@ -53,43 +53,69 @@ pipeline {
                             echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
                             AUTH=\$(cat auth.txt)
                             
-                            # Start test execution
-                            echo "Starting test execution..."
-                            START_RESPONSE=\$(curl -s -X PUT \\
+                            # Create test execution
+                            echo "Creating test execution..."
+                            EXEC_RESPONSE=\$(curl -s -X POST \\
                             -H "Authorization: Basic \$AUTH" \\
                             -H "Content-Type: application/json" \\
-                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
-                            -d '{"transition": {"id": "11"}}')
-                            echo "\$START_RESPONSE"
+                            "https://somfycucumber.atlassian.net/rest/api/2/issue" \\
+                            -d '{
+                                "fields": {
+                                    "project": {"key": "SMF2"},
+                                    "summary": "Test Execution - '"\$(date +%Y-%m-%d_%H-%M-%S)"'",
+                                    "description": "Automated test execution from Jenkins",
+                                    "issuetype": {"name": "Test Execution"}
+                                }
+                            }')
+                            echo "Execution Response: \$EXEC_RESPONSE"
                             
-                            # Import test results
-                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                echo "Uploading test results..."
-                                IMPORT_RESPONSE=\$(curl -s -X POST \\
+                            # Get execution key
+                            EXEC_KEY=\$(echo \$EXEC_RESPONSE | grep -o '"key":"[^"]*' | cut -d'"' -f4)
+                            echo "Test Execution Key: \$EXEC_KEY"
+                            
+                            # Link test to execution
+                            echo "Linking test to execution..."
+                            curl -s -X POST \\
+                            -H "Authorization: Basic \$AUTH" \\
+                            -H "Content-Type: application/json" \\
+                            "https://somfycucumber.atlassian.net/rest/api/2/issue/\$EXEC_KEY/links" \\
+                            -d '{
+                                "type": {"name": "Test"},
+                                "inwardIssue": {"key": "SMF2-1"}
+                            }'
+                            
+                            # Upload test results
+                            echo "Uploading test results..."
+                            RESULT_RESPONSE=\$(curl -s -X POST \\
+                            -H "Authorization: Basic \$AUTH" \\
+                            -H "Content-Type: application/json" \\
+                            --data-binary @target/cucumber-reports/cucumber.json \\
+                            "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=\$EXEC_KEY")
+                            echo "Result Response: \$RESULT_RESPONSE"
+                            
+                            # Update test status
+                            if grep -q '"status": "passed"' target/cucumber-reports/cucumber.json; then
+                                echo "Tests passed, updating status..."
+                                curl -s -X PUT \\
                                 -H "Authorization: Basic \$AUTH" \\
                                 -H "Content-Type: application/json" \\
-                                --data-binary @target/cucumber-reports/cucumber.json \\
-                                "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-1")
-                                echo "\$IMPORT_RESPONSE"
-                                
-                                # Check if tests passed
-                                if grep -q '"status": "PASSED"' target/cucumber-reports/cucumber.json; then
-                                    echo "Tests passed, updating status to Done..."
-                                    curl -s -X PUT \\
-                                    -H "Authorization: Basic \$AUTH" \\
-                                    -H "Content-Type: application/json" \\
-                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
-                                    -d '{"transition": {"id": "31"}}'
-                                else
-                                    echo "Tests failed, updating status to Failed..."
-                                    curl -s -X PUT \\
-                                    -H "Authorization: Basic \$AUTH" \\
-                                    -H "Content-Type: application/json" \\
-                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
-                                    -d '{"transition": {"id": "41"}}'
-                                fi
+                                "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1" \\
+                                -d '{
+                                    "fields": {
+                                        "status": {"name": "Done"}
+                                    }
+                                }'
                             else
-                                echo "No test results found!"
+                                echo "Tests failed, updating status..."
+                                curl -s -X PUT \\
+                                -H "Authorization: Basic \$AUTH" \\
+                                -H "Content-Type: application/json" \\
+                                "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1" \\
+                                -d '{
+                                    "fields": {
+                                        "status": {"name": "Failed"}
+                                    }
+                                }'
                             fi
                             
                             rm auth.txt
