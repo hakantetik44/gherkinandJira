@@ -16,7 +16,14 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh "mvn clean test"
+                script {
+                    try {
+                        sh "mvn clean test -Dcucumber.options='--plugin json:target/cucumber-reports/cucumber.json'"
+                    } catch (Exception e) {
+                        currentBuild.result = 'UNSTABLE'
+                        error("Test execution failed: ${e.message}")
+                    }
+                }
             }
         }
 
@@ -34,49 +41,53 @@ pipeline {
 
         stage('Update Xray Test Results') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'jira-api',
-                    usernameVariable: 'JIRA_USER',
-                    passwordVariable: 'JIRA_TOKEN'
-                )]) {
-                    sh '''
-                        # Base64 encode credentials
-                        echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
-                        AUTH=$(cat auth.txt)
-                        
-                        # Update test execution status in Jira
-                        curl -X PUT \\
-                        -H "Authorization: Basic $AUTH" \\
-                        -H "Content-Type: application/json" \\
-                        "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
-                        -d '{"transition": {"id": "11"}}'  # 11 is the ID for "In Progress"
-                        
-                        # Import test results to Xray
-                        curl -X POST \\
-                        -H "Authorization: Basic $AUTH" \\
-                        -H "Content-Type: application/json" \\
-                        --data-binary @target/cucumber-reports/cucumber.json \\
-                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-2"
-                        
-                        # Update test execution status based on test results
-                        if [ $? -eq 0 ]; then
-                            # If tests passed, transition to Done
+                script {
+                    def testsPassed = fileExists 'target/cucumber-reports/cucumber.json'
+                    
+                    withCredentials([usernamePassword(
+                        credentialsId: 'jira-api',
+                        usernameVariable: 'JIRA_USER',
+                        passwordVariable: 'JIRA_TOKEN'
+                    )]) {
+                        sh """
+                            # Base64 encode credentials
+                            echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
+                            AUTH=\$(cat auth.txt)
+                            
+                            # Start test execution
                             curl -X PUT \\
-                            -H "Authorization: Basic $AUTH" \\
+                            -H "Authorization: Basic \$AUTH" \\
                             -H "Content-Type: application/json" \\
                             "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
-                            -d '{"transition": {"id": "31"}}'  # 31 is the ID for "Done"
-                        else
-                            # If tests failed, transition to Failed
-                            curl -X PUT \\
-                            -H "Authorization: Basic $AUTH" \\
-                            -H "Content-Type: application/json" \\
-                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
-                            -d '{"transition": {"id": "41"}}'  # 41 is the ID for "Failed"
-                        fi
-                        
-                        rm auth.txt
-                    '''
+                            -d '{"transition": {"id": "11"}}'
+                            
+                            # Import test results
+                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
+                                curl -X POST \\
+                                -H "Authorization: Basic \$AUTH" \\
+                                -H "Content-Type: application/json" \\
+                                --data-binary @target/cucumber-reports/cucumber.json \\
+                                "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-2"
+                                
+                                # Update status based on test results
+                                if [ \$? -eq 0 ]; then
+                                    curl -X PUT \\
+                                    -H "Authorization: Basic \$AUTH" \\
+                                    -H "Content-Type: application/json" \\
+                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                                    -d '{"transition": {"id": "31"}}'
+                                else
+                                    curl -X PUT \\
+                                    -H "Authorization: Basic \$AUTH" \\
+                                    -H "Content-Type: application/json" \\
+                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                                    -d '{"transition": {"id": "41"}}'
+                                fi
+                            fi
+                            
+                            rm auth.txt
+                        """
+                    }
                 }
             }
         }
@@ -112,6 +123,9 @@ pipeline {
         }
         failure {
             echo "❌ Tests failed"
+        }
+        unstable {
+            echo "⚠️ Tests are unstable"
         }
     }
 } 
