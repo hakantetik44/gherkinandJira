@@ -40,19 +40,41 @@ pipeline {
                     passwordVariable: 'JIRA_TOKEN'
                 )]) {
                     sh '''
+                        # Base64 encode credentials
                         echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
                         AUTH=$(cat auth.txt)
                         
-                        # Get Xray Cloud API token
-                        XRAY_TOKEN=$(curl -H "Content-Type: application/json" -X POST --data "{ \\"client_id\\": \\"${JIRA_USER}\\", \\"client_secret\\": \\"${JIRA_TOKEN}\\" }" https://xray.cloud.getxray.app/api/v2/authenticate)
-                        
-                        # Update test execution results
-                        curl -X POST \\
+                        # Update test execution status in Jira
+                        curl -X PUT \\
+                        -H "Authorization: Basic $AUTH" \\
                         -H "Content-Type: application/json" \\
-                        -H "Authorization: Bearer ${XRAY_TOKEN}" \\
+                        "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                        -d '{"transition": {"id": "11"}}'  # 11 is the ID for "In Progress"
+                        
+                        # Import test results to Xray
+                        curl -X POST \\
+                        -H "Authorization: Basic $AUTH" \\
+                        -H "Content-Type: application/json" \\
                         --data-binary @target/cucumber-reports/cucumber.json \\
-                        "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/multipart?testExecKey=SMF2-2"
-
+                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-2"
+                        
+                        # Update test execution status based on test results
+                        if [ $? -eq 0 ]; then
+                            # If tests passed, transition to Done
+                            curl -X PUT \\
+                            -H "Authorization: Basic $AUTH" \\
+                            -H "Content-Type: application/json" \\
+                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                            -d '{"transition": {"id": "31"}}'  # 31 is the ID for "Done"
+                        else
+                            # If tests failed, transition to Failed
+                            curl -X PUT \\
+                            -H "Authorization: Basic $AUTH" \\
+                            -H "Content-Type: application/json" \\
+                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                            -d '{"transition": {"id": "41"}}'  # 41 is the ID for "Failed"
+                        fi
+                        
                         rm auth.txt
                     '''
                 }
