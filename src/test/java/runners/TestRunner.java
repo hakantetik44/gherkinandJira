@@ -14,7 +14,7 @@ import org.junit.runner.RunWith;
         "json:target/cucumber-reports/cucumber.json",
         "junit:target/cucumber-reports/cucumber.xml"
     },
-    monochrome = true
+    tags = "@TestCaseKey=SMF2-1"
 )
 public class TestRunner {
 } 

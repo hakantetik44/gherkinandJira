@@ -42,41 +42,23 @@ pipeline {
 
         stage('Update Xray Test Results') {
             steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'jira-api',
-                        usernameVariable: 'JIRA_USER',
-                        passwordVariable: 'JIRA_TOKEN'
-                    )]) {
-                        sh '''
-                            # Base64 encode credentials
-                            echo -n "$JIRA_USER:$JIRA_TOKEN" | base64 > auth.txt
-                            AUTH=$(cat auth.txt)
-                            
-                            # Create test execution
-                            echo "Creating test execution..."
-                            EXEC_RESPONSE=$(curl -s -X POST \
-                            -H "Authorization: Basic $AUTH" \
-                            -H "Content-Type: application/json" \
-                            "https://somfycucumber.atlassian.net/rest/api/2/issue" \
-                            -d "{\"fields\": {\"project\": {\"key\": \"SMF2\"}, \"summary\": \"Test Execution - $(date +%Y-%m-%d_%H-%M-%S)\", \"description\": \"Automated test execution from Jenkins\", \"issuetype\": {\"name\": \"Test Execution\"}}}")
-                            
-                            echo "Execution Response: $EXEC_RESPONSE"
-                            
-                            # Get execution key
-                            EXEC_KEY=$(echo $EXEC_RESPONSE | grep -o '"key":"[^"]*' | cut -d'"' -f4)
-                            echo "Test Execution Key: $EXEC_KEY"
-                            
-                            # Upload test results
-                            RESULT_RESPONSE=$(curl -s -X POST \
-                            -H "Authorization: Basic $AUTH" \
-                            -H "Content-Type: application/json" \
-                            --data-binary @target/cucumber-reports/cucumber.json \
-                            "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=$EXEC_KEY")
-                            
-                            rm auth.txt
-                        '''
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: 'jira-api',
+                    usernameVariable: 'JIRA_USER',
+                    passwordVariable: 'JIRA_TOKEN'
+                )]) {
+                    sh '''
+                        # Encode credentials
+                        AUTH=$(echo -n "$JIRA_USER:$JIRA_TOKEN" | base64)
+                        
+                        # Upload test results directly to Xray
+                        echo "Uploading test results to Xray..."
+                        curl -v -X POST \
+                        -H "Authorization: Basic $AUTH" \
+                        -H "Content-Type: application/json" \
+                        --data @target/cucumber-reports/cucumber.json \
+                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber"
+                    '''
                 }
             }
         }
