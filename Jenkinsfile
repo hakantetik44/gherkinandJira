@@ -6,15 +6,20 @@ pipeline {
         jdk 'JDK17'
     }
 
+    options {
+        skipDefaultCheckout(false)
+    }
+
     environment {
-        JIRA_CREDENTIALS = credentials('jira-credentials')
+        JIRA_CREDS = credentials('jira-credentials')
     }
 
     stages {
         stage('Initialize') {
             steps {
                 cleanWs()
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/hakantetik44/gherkinandJira.git'
             }
         }
 
@@ -45,18 +50,20 @@ pipeline {
 
         stage('Upload to Xray') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'jira-credentials', 
-                                                usernameVariable: 'JIRA_USER', 
-                                                passwordVariable: 'JIRA_PASS')]) {
-                    script {
-                        def cucumberJson = readFile 'target/cucumber-reports/cucumber.json'
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'jira-credentials',
+                        usernameVariable: 'JIRA_USER',
+                        passwordVariable: 'JIRA_TOKEN'
+                    )]) {
+                        def auth = "${JIRA_USER}:${JIRA_TOKEN}".bytes.encodeBase64().toString()
                         def response = httpRequest(
                             url: 'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber',
                             httpMode: 'POST',
-                            customHeaders: [[name: 'Authorization', value: "Basic ${JIRA_PASS}"]], 
-                            requestBody: cucumberJson
+                            customHeaders: [[name: 'Authorization', value: "Basic ${auth}"]], 
+                            requestBody: readFile('target/cucumber-reports/cucumber.json')
                         )
-                        println("Xray Response: ${response.status}")
+                        echo "Xray Response: ${response.status}"
                     }
                 }
             }
@@ -64,10 +71,11 @@ pipeline {
 
         stage('Archive Reports') {
             steps {
-                archiveArtifacts artifacts: [
-                    'test-reports.zip',
-                    'target/cucumber-reports/**/*'
-                ].join(', '), fingerprint: true, allowEmptyArchive: true
+                archiveArtifacts(
+                    artifacts: 'test-reports.zip,target/cucumber-reports/**/*',
+                    fingerprint: true,
+                    allowEmptyArchive: true
+                )
                 
                 allure([
                     reportBuildPolicy: 'ALWAYS',
@@ -86,21 +94,13 @@ pipeline {
 
     post {
         always {
-            node(null) {
-                cleanWs()
-            }
+            cleanWs()
         }
-
         success {
-            node(null) {
-                echo "✅ Tests completed successfully"
-            }
+            echo "✅ Tests completed successfully"
         }
-
         failure {
-            node(null) {
-                echo "❌ Tests failed"
-            }
+            echo "❌ Tests failed"
         }
     }
 } 
