@@ -12,12 +12,10 @@ import org.junit.runner.RunWith;
         "pretty",
         "json:target/cucumber-reports/cucumber.json",
         "html:target/cucumber-reports/cucumber.html",
-        "junit:target/cucumber-reports/cucumber.xml",
-        "rerun:target/failed_scenarios.txt"
+        "junit:target/cucumber-reports/cucumber.xml"
     },
     monochrome = true,
-    dryRun = false,
-    tags = "@test and @TestKey=SMF2-1"
+    tags = "@TestKey=SMF2-1"
 )
 public class TestRunner {
 } 

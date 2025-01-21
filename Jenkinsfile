@@ -45,37 +45,72 @@ pipeline {
 
         stage('Generate Xray Results') {
             steps {
-                script {
-                    sh '''
-                        mkdir -p xray-results
-                        if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                            echo "Creating Xray import file..."
-                            echo '{
-                                "info": {
-                                    "summary": "Test Execution Results",
-                                    "description": "Results from Jenkins Pipeline",
-                                    "project": "SMF2",
-                                    "version": "1.0",
-                                    "revision": "'${BUILD_NUMBER}'"
-                                },
-                                "testExecutionKey": "SMF2-2",
-                                "testPlanKey": "SMF2-2",
-                                "tests": [
-                                    {
-                                        "testKey": "SMF2-1",
-                                        "start": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
-                                        "finish": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
-                                        "comment": "Executed from Jenkins Pipeline",
-                                        "status": "PASS"
-                                    }
-                                ]
-                            }' > xray-results/xray-import.json
-                        else
-                            echo "No cucumber.json file found!"
-                            exit 1
-                        fi
-                    '''
-                    archiveArtifacts artifacts: 'xray-results/xray-import.json', allowEmptyArchive: true
+                withCredentials([usernamePassword(
+                    credentialsId: 'somfy',
+                    usernameVariable: 'JIRA_USER',
+                    passwordVariable: 'JIRA_TOKEN'
+                )]) {
+                    script {
+                        sh '''
+                            mkdir -p xray-results
+                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
+                                echo "Creating Xray import file..."
+                                
+                                # Get test result status from cucumber.json
+                                TEST_STATUS=$(cat target/cucumber-reports/cucumber.json | grep -o '"status": "[^"]*"' | head -1 | cut -d'"' -f4)
+                                if [ "$TEST_STATUS" = "passed" ]; then
+                                    STATUS="PASS"
+                                else
+                                    STATUS="FAIL"
+                                fi
+                                
+                                # Create base64 auth
+                                AUTH=$(echo -n "$JIRA_USER:$JIRA_TOKEN" | base64)
+                                
+                                # Create Xray import file with Cucumber results
+                                echo '{
+                                    "info": {
+                                        "summary": "Test Execution Results from Jenkins",
+                                        "description": "Automated test execution",
+                                        "project": "SMF2",
+                                        "user": "'$JIRA_USER'"
+                                    },
+                                    "testExecutionKey": "SMF2-2",
+                                    "tests": [
+                                        {
+                                            "testKey": "SMF2-1",
+                                            "status": "'$STATUS'",
+                                            "comment": "Executed from Jenkins Pipeline",
+                                            "evidence": "'$(cat target/cucumber-reports/cucumber.json | base64)'"
+                                        }
+                                    ]
+                                }' > xray-results/xray-import.json
+                                
+                                # Debug output
+                                echo "Uploading results to Xray..."
+                                echo "Using credentials: $JIRA_USER"
+                                echo "Auth header: Basic $AUTH"
+                                
+                                # Upload to Xray with detailed output
+                                curl -v -X POST \
+                                    -H "Authorization: Basic $AUTH" \
+                                    -H "Content-Type: application/json" \
+                                    -H "Accept: application/json" \
+                                    --data @xray-results/xray-import.json \
+                                    "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber" 2>&1 | tee xray-response.log
+                                
+                                # Check response
+                                if [ -f xray-response.log ]; then
+                                    echo "Xray API Response:"
+                                    cat xray-response.log
+                                fi
+                            else
+                                echo "No cucumber.json file found!"
+                                exit 1
+                            fi
+                        '''
+                        archiveArtifacts artifacts: 'xray-results/xray-import.json,xray-response.log', allowEmptyArchive: true
+                    }
                 }
             }
         }
