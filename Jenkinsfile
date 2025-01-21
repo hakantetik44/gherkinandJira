@@ -43,12 +43,15 @@ pipeline {
                         echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
                         AUTH=$(cat auth.txt)
                         
+                        # Get Xray Cloud API token
+                        XRAY_TOKEN=$(curl -H "Content-Type: application/json" -X POST --data "{ \\"client_id\\": \\"${JIRA_USER}\\", \\"client_secret\\": \\"${JIRA_TOKEN}\\" }" https://xray.cloud.getxray.app/api/v2/authenticate)
+                        
                         # Update test execution results
-                        curl -v -X POST \\
-                        -H "Authorization: Basic $AUTH" \\
+                        curl -X POST \\
                         -H "Content-Type: application/json" \\
+                        -H "Authorization: Bearer ${XRAY_TOKEN}" \\
                         --data-binary @target/cucumber-reports/cucumber.json \\
-                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber/SMF2-1?testExecKey=SMF2-2"
+                        "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/multipart?testExecKey=SMF2-2"
 
                         rm auth.txt
                     '''
