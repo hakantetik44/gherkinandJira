@@ -49,20 +49,15 @@ pipeline {
                 withCredentials([string(credentialsId: 'xray-api-key', variable: 'XRAY_API_KEY')]) {
                     script {
                         sh """
-                            echo "Uploading test results to Xray..."
+                            echo "Uploading test results to existing Xray test execution..."
                             
-                            # Debug için cucumber.json içeriğini göster
-                            echo "Cucumber JSON content:"
-                            cat target/cucumber-reports/cucumber.json
-                            
-                            # Test sonuçlarını Xray'e gönder
+                            # Test sonuçlarını mevcut execution'a gönder
                             curl -v -H "Content-Type: application/json" \
                                  -H "Authorization: Bearer ${XRAY_API_KEY}" \
                                  -X POST \
                                  --data @target/cucumber-reports/cucumber.json \
-                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber" 2>&1 | tee xray-response.log
+                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/SMF-2" 2>&1 | tee xray-response.log
                             
-                            # Xray yanıtını kontrol et
                             echo "Xray response:"
                             cat xray-response.log
                         """
