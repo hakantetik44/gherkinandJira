@@ -4,7 +4,7 @@ Feature: Accepter les cookies sur Somfy
   Je veux accepter les cookies
   Afin de naviguer sur le site
 
-  @test @SMF2-1
+  @SMF2-1
   Scenario: Accepter les cookies et naviguer vers Produits
     Given je suis sur la page d'accueil de Somfy
     When je clique sur le bouton "TOUT ACCEPTER"

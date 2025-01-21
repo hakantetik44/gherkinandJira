@@ -10,11 +10,14 @@ import org.junit.runner.RunWith;
     glue = "stepdefinitions",
     plugin = {
         "pretty",
-        "html:target/cucumber-reports/cucumber.html",
         "json:target/cucumber-reports/cucumber.json",
-        "junit:target/cucumber-reports/cucumber.xml"
+        "html:target/cucumber-reports/cucumber.html",
+        "junit:target/cucumber-reports/cucumber.xml",
+        "rerun:target/failed_scenarios.txt"
     },
-    tags = "@TestCaseKey=SMF2-1"
+    monochrome = true,
+    dryRun = false,
+    tags = "@test"
 )
 public class TestRunner {
 } 
