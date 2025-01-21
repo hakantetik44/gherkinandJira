@@ -35,6 +35,7 @@ pipeline {
             steps {
                 sh """
                     mkdir -p test-reports
+                    mkdir -p target/allure-results
                     cp -r target/cucumber-reports/* test-reports/ || true
                     cp -r target/surefire-reports test-reports/ || true
                     cp -r target/allure-results test-reports/ || true

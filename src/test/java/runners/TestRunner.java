@@ -12,7 +12,8 @@ import org.junit.runner.RunWith;
         "pretty",
         "json:target/cucumber-reports/cucumber.json",
         "html:target/cucumber-reports/cucumber.html",
-        "junit:target/cucumber-reports/cucumber.xml"
+        "junit:target/cucumber-reports/cucumber.xml",
+        "io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm"
     },
     monochrome = true,
     tags = "@TestKey=SMF2-1"
