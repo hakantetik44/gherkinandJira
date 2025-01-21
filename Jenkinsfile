@@ -49,17 +49,31 @@ pipeline {
                 withCredentials([string(credentialsId: 'xray-api-key', variable: 'XRAY_API_KEY')]) {
                     script {
                         sh """
-                            echo "Uploading test results to existing Xray test execution..."
+                            echo "Checking test results..."
+                            if [ ! -f "target/cucumber-reports/cucumber.json" ]; then
+                                echo "Error: cucumber.json not found!"
+                                exit 1
+                            fi
                             
-                            # Test sonuçlarını mevcut execution'a gönder
-                            curl -v -H "Content-Type: application/json" \
+                            echo "Preparing test results for Xray..."
+                            TEST_EXECUTION_KEY="SMF-2"
+                            
+                            echo "Uploading results to Xray Test Execution: \${TEST_EXECUTION_KEY}"
+                            RESPONSE=\$(curl -v -H "Content-Type: application/json" \
                                  -H "Authorization: Bearer ${XRAY_API_KEY}" \
                                  -X POST \
                                  --data @target/cucumber-reports/cucumber.json \
-                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/SMF-2" 2>&1 | tee xray-response.log
+                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/\${TEST_EXECUTION_KEY}" 2>&1)
                             
-                            echo "Xray response:"
-                            cat xray-response.log
+                            echo "\${RESPONSE}" > xray-response.log
+                            
+                            if echo "\${RESPONSE}" | grep -q "error"; then
+                                echo "Error uploading to Xray:"
+                                cat xray-response.log
+                                exit 1
+                            else
+                                echo "Successfully uploaded test results to Xray"
+                            fi
                         """
                         
                         archiveArtifacts artifacts: 'xray-response.log', allowEmptyArchive: true
