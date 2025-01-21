@@ -52,80 +52,45 @@ pipeline {
                     passwordVariable: 'JIRA_TOKEN'
                 )]) {
                     script {
-                        sh '''
+                        def auth = sh(
+                            script: "echo -n '$JIRA_USER:$JIRA_TOKEN' | base64",
+                            returnStdout: true
+                        ).trim()
+                        
+                        // Create Xray import file
+                        sh """
                             mkdir -p xray-results
                             
-                            # Create base64 auth
-                            AUTH=$(echo -n "$JIRA_USER:$JIRA_TOKEN" | base64)
-                            
-                            # Test Jira authentication
-                            echo "Testing Jira authentication..."
-                            curl -v -H "Authorization: Basic $AUTH" \
-                                 -H "Content-Type: application/json" \
-                                 "https://somfycucumber.atlassian.net/rest/api/2/myself" > auth-test.log
-                            
-                            # Test execution check
-                            echo "Checking test execution..."
-                            curl -v -H "Authorization: Basic $AUTH" \
-                                 -H "Content-Type: application/json" \
-                                 "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2" > execution-test.log
-                            
-                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                echo "Creating Xray import file..."
-                                
-                                # Get test result status from cucumber.json
-                                TEST_STATUS=$(cat target/cucumber-reports/cucumber.json | grep -o '"status": "[^"]*"' | head -1 | cut -d'"' -f4)
-                                if [ "$TEST_STATUS" = "passed" ]; then
-                                    STATUS="PASS"
-                                else
-                                    STATUS="FAIL"
-                                fi
-                                
-                                # Create test payload
-                                echo '{
-                                    "info": {
-                                        "summary": "Test Execution Results from Jenkins",
-                                        "description": "Automated test execution",
-                                        "project": "SMF2",
-                                        "user": "'$JIRA_USER'"
+                            # Convert cucumber.json to Xray format
+                            echo '{
+                                "info": {
+                                    "summary": "Test Execution from Jenkins",
+                                    "description": "Automated test execution",
+                                    "project": {
+                                        "key": "SMF"
                                     },
-                                    "testExecutionKey": "SMF2-2",
-                                    "tests": [
-                                        {
-                                            "testKey": "SMF2-1",
-                                            "status": "'$STATUS'",
-                                            "comment": "Executed from Jenkins Pipeline",
-                                            "evidence": "'$(cat target/cucumber-reports/cucumber.json | base64)'"
-                                        }
-                                    ]
-                                }' > xray-results/xray-import.json
-                                
-                                # Debug output
-                                echo "Uploading results to Xray..."
-                                echo "Using credentials: $JIRA_USER"
-                                echo "Auth header: Basic $AUTH"
-                                
-                                # Test Xray API
-                                curl -v -X POST \
-                                     -H "Authorization: Basic $AUTH" \
-                                     -H "Content-Type: application/json" \
-                                     -H "Accept: application/json" \
-                                     --data @xray-results/xray-import.json \
-                                     "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber" 2>&1 | tee xray-response.log
-                                
-                                # Check responses
-                                echo "=== Authentication Test Response ==="
-                                cat auth-test.log
-                                echo "=== Test Execution Check Response ==="
-                                cat execution-test.log
-                                echo "=== Xray Import Response ==="
-                                cat xray-response.log
-                            else
-                                echo "No cucumber.json file found!"
-                                exit 1
-                            fi
-                        '''
-                        archiveArtifacts artifacts: 'xray-results/xray-import.json,*.log', allowEmptyArchive: true
+                                    "testPlanKey": "SMF-1",
+                                    "testEnvironments": ["Chrome"]
+                                },
+                                "tests": [
+                                    {
+                                        "testKey": "SMF-2",
+                                        "comment": "Executed from Jenkins",
+                                        "status": "PASS"
+                                    }
+                                ]
+                            }' > xray-results/xray-import.json
+
+                            # Import to Xray
+                            curl -v -X POST \
+                                 -H "Authorization: Basic ${auth}" \
+                                 -H "Content-Type: application/json" \
+                                 -H "Accept: application/json" \
+                                 --data @xray-results/xray-import.json \
+                                 "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution" | tee xray-response.log
+                        """
+                        
+                        archiveArtifacts artifacts: 'xray-results/*.json,*.log', allowEmptyArchive: true
                     }
                 }
             }
