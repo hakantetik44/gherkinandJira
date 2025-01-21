@@ -94,13 +94,25 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            script {
+                node('built-in') {
+                    cleanWs()
+                }
+            }
         }
         success {
-            echo "✅ Tests completed successfully"
+            script {
+                node('built-in') {
+                    echo "✅ Tests completed successfully"
+                }
+            }
         }
         failure {
-            echo "❌ Tests failed"
+            script {
+                node('built-in') {
+                    echo "❌ Tests failed"
+                }
+            }
         }
     }
 } 
