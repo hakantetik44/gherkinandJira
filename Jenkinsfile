@@ -56,31 +56,27 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'jira-api',
-                    usernameVariable: 'JIRA_USER',
-                    passwordVariable: 'JIRA_TOKEN'
-                )]) {
-                    script {
-                        try {
+                script {
+                    try {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'jira-api',
+                            usernameVariable: 'JIRA_USER',
+                            passwordVariable: 'JIRA_TOKEN'
+                        )]) {
                             def cucumberJson = readFile(file: 'target/cucumber-reports/cucumber.json')
                             def encodedAuth = "${JIRA_USER}:${JIRA_TOKEN}".bytes.encodeBase64().toString()
                             
-                            def response = sh(
-                                script: """
-                                    curl -X POST \
-                                    -H 'Authorization: Basic ${encodedAuth}' \
-                                    -H 'Content-Type: application/json' \
-                                    --data-binary @target/cucumber-reports/cucumber.json \
-                                    'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber'
-                                """,
-                                returnStdout: true
-                            )
-                            echo "Xray Response: ${response}"
-                        } catch (Exception e) {
-                            echo "Warning: Failed to upload results to Xray: ${e.message}"
-                            unstable("Xray upload failed")
+                            sh """
+                                curl -v -X POST \
+                                -H 'Authorization: Basic ${encodedAuth}' \
+                                -H 'Content-Type: application/json' \
+                                --data-binary @target/cucumber-reports/cucumber.json \
+                                'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber'
+                            """
                         }
+                    } catch (Exception e) {
+                        echo "Warning: Failed to upload results to Xray: ${e.message}"
+                        unstable("Xray upload failed")
                     }
                 }
             }
