@@ -25,14 +25,19 @@ pipeline {
                     try {
                         sh "mvn clean test"
                     } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        error("Test execution failed: ${e.message}")
+                        unstable("Test execution failed: ${e.message}")
+                        return
                     }
                 }
             }
         }
 
         stage('Generate Reports') {
+            when {
+                not {
+                    equals expected: 'FAILURE', actual: currentBuild.result
+                }
+            }
             steps {
                 sh """
                     mkdir -p test-reports
@@ -45,6 +50,11 @@ pipeline {
         }
 
         stage('Upload to Xray') {
+            when {
+                not {
+                    equals expected: 'FAILURE', actual: currentBuild.result
+                }
+            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'jira-api',
@@ -69,7 +79,7 @@ pipeline {
                             echo "Xray Response: ${response}"
                         } catch (Exception e) {
                             echo "Warning: Failed to upload results to Xray: ${e.message}"
-                            currentBuild.result = 'UNSTABLE'
+                            unstable("Xray upload failed")
                         }
                     }
                 }
@@ -77,6 +87,11 @@ pipeline {
         }
 
         stage('Archive Reports') {
+            when {
+                not {
+                    equals expected: 'FAILURE', actual: currentBuild.result
+                }
+            }
             steps {
                 archiveArtifacts(
                     artifacts: 'test-reports.zip,target/cucumber-reports/**/*',
@@ -105,6 +120,9 @@ pipeline {
         }
         success {
             echo "✅ Tests completed successfully"
+        }
+        unstable {
+            echo "⚠️ Build is unstable"
         }
         failure {
             echo "❌ Tests failed"
