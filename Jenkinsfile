@@ -42,12 +42,29 @@ pipeline {
                     sh '''
                         echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64 > auth.txt
                         AUTH=$(cat auth.txt)
+                        
+                        # Test execution bilgilerini içeren JSON oluştur
+                        cat > execution.json << EOF
+                        {
+                            "info": {
+                                "summary": "Automated test execution from Jenkins",
+                                "description": "Test results from Jenkins pipeline",
+                                "project": "SMF2",
+                                "testPlanKey": "SMF2-2",
+                                "testEnvironments": ["QA"]
+                            },
+                            "tests": [$(cat target/cucumber-reports/cucumber.json)]
+                        }
+EOF
+                        
+                        # Xray'e gönder
                         curl -v -X POST \\
                         -H "Authorization: Basic $AUTH" \\
                         -H "Content-Type: application/json" \\
-                        --data-binary @target/cucumber-reports/cucumber.json \\
+                        --data @execution.json \\
                         "https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber"
-                        rm auth.txt
+                        
+                        rm auth.txt execution.json
                     '''
                 }
             }
