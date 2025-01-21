@@ -52,28 +52,27 @@ pipeline {
                     passwordVariable: 'JIRA_TOKEN'
                 )]) {
                     script {
+                        def auth = sh(
+                            script: '''#!/bin/bash
+                                echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        
                         sh """
-                            # Get Xray Cloud API token
-                            XRAY_TOKEN=\$(curl -H "Content-Type: application/json" \
-                                -X POST \
-                                --data '{"client_id": "${JIRA_USER}","client_secret": "${JIRA_TOKEN}"}' \
-                                https://xray.cloud.getxray.app/api/v2/authenticate)
-                            
-                            echo "Xray token obtained: \${XRAY_TOKEN}"
+                            echo "Using auth: Basic ${auth}"
                             
                             if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                # Upload test results to Xray Cloud
-                                curl -X POST \
+                                echo "Uploading test results..."
+                                curl -v -X POST \
+                                     -H "Authorization: Basic ${auth}" \
                                      -H "Content-Type: application/json" \
-                                     -H "Authorization: Bearer \${XRAY_TOKEN}" \
+                                     -H "Accept: application/json" \
                                      --data @target/cucumber-reports/cucumber.json \
-                                     "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber" | tee xray-response.log
+                                     "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber" 2>&1 | tee xray-response.log
                                 
-                                if [ \$? -ne 0 ]; then
-                                    echo "Error: Xray API call failed"
-                                    cat xray-response.log
-                                    exit 1
-                                fi
+                                echo "Xray response:"
+                                cat xray-response.log
                             else
                                 echo "No cucumber.json file found!"
                                 exit 1
