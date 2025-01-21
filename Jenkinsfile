@@ -52,63 +52,22 @@ pipeline {
                     passwordVariable: 'JIRA_TOKEN'
                 )]) {
                     script {
-                        def auth = sh(
-                            script: '''#!/bin/bash
-                                echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64
-                            ''',
-                            returnStdout: true
-                        ).trim()
-                        
                         sh """
-                            mkdir -p xray-results
+                            # Get Xray Cloud API token
+                            XRAY_TOKEN=\$(curl -H "Content-Type: application/json" \
+                                -X POST \
+                                --data '{"client_id": "${JIRA_USER}","client_secret": "${JIRA_TOKEN}"}' \
+                                https://xray.cloud.getxray.app/api/v2/authenticate)
                             
-                            # Convert cucumber.json to Xray format
+                            echo "Xray token obtained: \${XRAY_TOKEN}"
+                            
                             if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                echo "Creating Xray import file..."
-                                
-                                echo '{
-                                    "info": {
-                                        "summary": "Somfy Web UI Test Execution",
-                                        "description": "Automated test execution for Somfy web UI features",
-                                        "project": {
-                                            "key": "SMF"
-                                        },
-                                        "testPlanKey": "SMF-1",
-                                        "testEnvironments": ["Chrome"]
-                                    },
-                                    "tests": [
-                                        {
-                                            "testKey": "SMF-2",
-                                            "comment": "Cookie acceptance and navigation test",
-                                            "status": "PASS",
-                                            "evidence": "Test executed successfully",
-                                            "steps": [
-                                                {
-                                                    "status": "PASS",
-                                                    "comment": "Navigate to Somfy homepage"
-                                                },
-                                                {
-                                                    "status": "PASS",
-                                                    "comment": "Accept cookies"
-                                                },
-                                                {
-                                                    "status": "PASS",
-                                                    "comment": "Navigate to Products page"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }' > xray-results/xray-import.json
-
-                                echo "Using Authorization: Basic ${auth}"
-                                
-                                # Import to Xray using multipart endpoint
-                                curl -v -X POST \
-                                     -H "Authorization: Basic ${auth}" \
-                                     -H "Content-Type: multipart/form-data" \
-                                     -F "file=@target/cucumber-reports/cucumber.json" \
-                                     -F "info=@xray-results/xray-import.json" \
-                                     "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber/multipart" 2>&1 | tee xray-response.log
+                                # Upload test results to Xray Cloud
+                                curl -X POST \
+                                     -H "Content-Type: application/json" \
+                                     -H "Authorization: Bearer \${XRAY_TOKEN}" \
+                                     --data @target/cucumber-reports/cucumber.json \
+                                     "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber" | tee xray-response.log
                                 
                                 if [ \$? -ne 0 ]; then
                                     echo "Error: Xray API call failed"
@@ -121,7 +80,7 @@ pipeline {
                             fi
                         """
                         
-                        archiveArtifacts artifacts: 'xray-results/*.json,*.log', allowEmptyArchive: true
+                        archiveArtifacts artifacts: 'xray-response.log', allowEmptyArchive: true
                     }
                 }
             }
