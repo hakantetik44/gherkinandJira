@@ -86,15 +86,21 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            node(null) {
+                cleanWs()
+            }
         }
 
         success {
-            echo "✅ Tests completed successfully"
+            node(null) {
+                echo "✅ Tests completed successfully"
+            }
         }
 
         failure {
-            echo "❌ Tests failed"
+            node(null) {
+                echo "❌ Tests failed"
+            }
         }
     }
 } 
