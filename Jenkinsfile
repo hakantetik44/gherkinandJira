@@ -47,7 +47,7 @@ pipeline {
         stage('Upload to Xray') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'jira-credentials',
+                    credentialsId: 'jira-api',
                     usernameVariable: 'JIRA_USER',
                     passwordVariable: 'JIRA_TOKEN'
                 )]) {
@@ -69,6 +69,7 @@ pipeline {
                             echo "Xray Response: ${response}"
                         } catch (Exception e) {
                             echo "Warning: Failed to upload results to Xray: ${e.message}"
+                            currentBuild.result = 'UNSTABLE'
                         }
                     }
                 }
