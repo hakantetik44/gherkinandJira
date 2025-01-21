@@ -45,19 +45,32 @@ pipeline {
         }
 
         stage('Upload to Xray') {
-            environment {
-                JIRA_CREDS = credentials('jira-credentials')
-            }
             steps {
-                script {
-                    def auth = "${JIRA_CREDS_USR}:${JIRA_CREDS_PSW}".bytes.encodeBase64().toString()
-                    def response = httpRequest(
-                        url: 'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber',
-                        httpMode: 'POST',
-                        customHeaders: [[name: 'Authorization', value: "Basic ${auth}"]], 
-                        requestBody: readFile('target/cucumber-reports/cucumber.json')
-                    )
-                    echo "Xray Response: ${response.status}"
+                withCredentials([usernamePassword(
+                    credentialsId: 'jira-credentials',
+                    usernameVariable: 'JIRA_USER',
+                    passwordVariable: 'JIRA_TOKEN'
+                )]) {
+                    script {
+                        try {
+                            def cucumberJson = readFile(file: 'target/cucumber-reports/cucumber.json')
+                            def encodedAuth = "${JIRA_USER}:${JIRA_TOKEN}".bytes.encodeBase64().toString()
+                            
+                            def response = sh(
+                                script: """
+                                    curl -X POST \
+                                    -H 'Authorization: Basic ${encodedAuth}' \
+                                    -H 'Content-Type: application/json' \
+                                    --data-binary @target/cucumber-reports/cucumber.json \
+                                    'https://somfycucumber.atlassian.net/rest/raven/2.0/import/execution/cucumber'
+                                """,
+                                returnStdout: true
+                            )
+                            echo "Xray Response: ${response}"
+                        } catch (Exception e) {
+                            echo "Warning: Failed to upload results to Xray: ${e.message}"
+                        }
+                    }
                 }
             }
         }
