@@ -1,0 +1,7 @@
+stepdefinitions/Hooks.class
+pages/SomfyHomePage.class
+pages/BasePage.class
+runners/TestRunner.class
+utils/DriverManager.class
+stepdefinitions/SomfySteps.class
+pages/LoginPage.class
