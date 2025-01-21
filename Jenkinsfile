@@ -63,6 +63,32 @@ pipeline {
             }
         }
 
+        stage('Generate Xray Test Results') {
+            steps {
+                script {
+                    // Cucumber JSON dosyasını özel bir formatta oluştur
+                    sh '''
+                        echo '{
+                            "testExecutionKey": "SMF2-2",
+                            "info": {
+                                "summary": "Test Execution Results",
+                                "description": "Results from Jenkins Pipeline",
+                                "project": "SMF2",
+                                "version": "1.0"
+                            },
+                            "tests": [' > xray-import.json
+                    
+                    # Cucumber sonuçlarını ekle
+                    cat target/cucumber-reports/cucumber.json >> xray-import.json
+                    
+                    echo ']}' >> xray-import.json
+                '''
+                
+                // Sonuç dosyasını arşivle
+                archiveArtifacts artifacts: 'xray-import.json', allowEmptyArchive: true
+            }
+        }
+
         stage('Archive Reports') {
             steps {
                 archiveArtifacts(
