@@ -7,14 +7,14 @@ import org.junit.runner.RunWith;
 @RunWith(Cucumber.class)
 @CucumberOptions(
     features = "src/test/resources/features",
-    glue = {"stepdefinitions"},
+    glue = "stepdefinitions",
     plugin = {
         "pretty",
-        "io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm",
+        "html:target/cucumber-reports/cucumber.html",
         "json:target/cucumber-reports/cucumber.json",
         "junit:target/cucumber-reports/cucumber.xml"
     },
-    tags = "@SMF2-1"
+    monochrome = true
 )
 public class TestRunner {
 } 

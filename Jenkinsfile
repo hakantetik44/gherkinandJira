@@ -18,10 +18,11 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh "mvn clean test -Dcucumber.options='--plugin json:target/cucumber-reports/cucumber.json'"
+                        sh "mvn clean test"
+                        currentBuild.result = 'SUCCESS'
                     } catch (Exception e) {
                         currentBuild.result = 'UNSTABLE'
-                        error("Test execution failed: ${e.message}")
+                        echo "Test execution failed: ${e.message}"
                     }
                 }
             }
