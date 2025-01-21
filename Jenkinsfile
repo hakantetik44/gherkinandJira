@@ -55,19 +55,14 @@ pipeline {
                                 exit 1
                             fi
                             
-                            echo "Preparing test results for Xray..."
-                            TEST_EXECUTION_KEY="SMF-2"
-                            
-                            echo "Uploading results to Xray Test Execution: \${TEST_EXECUTION_KEY}"
-                            RESPONSE=\$(curl -v -H "Content-Type: application/json" \
+                            echo "Uploading results to Xray Test Execution: SMF-2"
+                            curl -v -H "Content-Type: application/json" \
                                  -H "Authorization: Bearer ${XRAY_API_KEY}" \
                                  -X POST \
                                  --data @target/cucumber-reports/cucumber.json \
-                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/\${TEST_EXECUTION_KEY}" 2>&1)
+                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber/SMF-2" 2>&1 | tee xray-response.log
                             
-                            echo "\${RESPONSE}" > xray-response.log
-                            
-                            if echo "\${RESPONSE}" | grep -q "error"; then
+                            if grep -q "error" xray-response.log; then
                                 echo "Error uploading to Xray:"
                                 cat xray-response.log
                                 exit 1
