@@ -40,34 +40,11 @@ pipeline {
             }
         }
 
-        stage('Update Xray Test Results') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'jira-api',
-                    usernameVariable: 'JIRA_USER',
-                    passwordVariable: 'JIRA_TOKEN'
-                )]) {
-                    sh '''
-                        # Encode credentials
-                        AUTH=$(echo -n "$JIRA_USER:$JIRA_TOKEN" | base64)
-                        
-                        # Upload test results directly to Xray
-                        echo "Uploading test results to Xray..."
-                        curl -v -X POST \
-                        -H "Authorization: Basic $AUTH" \
-                        -H "Content-Type: application/json" \
-                        --data @target/cucumber-reports/cucumber.json \
-                        "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber"
-                    '''
-                }
-            }
-        }
-
-        stage('Generate Xray Test Results') {
+        stage('Generate Xray Results') {
             steps {
                 script {
-                    // Cucumber JSON dosyasını özel bir formatta oluştur
                     sh '''
+                        mkdir -p xray-results
                         echo '{
                             "testExecutionKey": "SMF2-2",
                             "info": {
@@ -76,16 +53,16 @@ pipeline {
                                 "project": "SMF2",
                                 "version": "1.0"
                             },
-                            "tests": [' > xray-import.json
+                            "tests": [
+                        ' > xray-results/xray-import.json
+                        
+                        cat target/cucumber-reports/cucumber.json >> xray-results/xray-import.json
+                        
+                        echo ']}' >> xray-results/xray-import.json
+                    '''
                     
-                    # Cucumber sonuçlarını ekle
-                    cat target/cucumber-reports/cucumber.json >> xray-import.json
-                    
-                    echo ']}' >> xray-import.json
-                '''
-                
-                // Sonuç dosyasını arşivle
-                archiveArtifacts artifacts: 'xray-import.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'xray-results/xray-import.json', allowEmptyArchive: true
+                }
             }
         }
 
