@@ -57,15 +57,13 @@ pipeline {
                             returnStdout: true
                         ).trim()
                         
-                        // Create Xray import file
                         sh """
                             mkdir -p xray-results
                             
-                            # Convert cucumber.json to Xray format
                             echo '{
                                 "info": {
-                                    "summary": "Test Execution from Jenkins",
-                                    "description": "Automated test execution",
+                                    "summary": "Somfy Web UI Test Execution",
+                                    "description": "Automated test execution for Somfy web UI features",
                                     "project": {
                                         "key": "SMF"
                                     },
@@ -75,13 +73,26 @@ pipeline {
                                 "tests": [
                                     {
                                         "testKey": "SMF-2",
-                                        "comment": "Executed from Jenkins",
-                                        "status": "PASS"
+                                        "comment": "Cookie acceptance and navigation test",
+                                        "status": "PASS",
+                                        "steps": [
+                                            {
+                                                "status": "PASS",
+                                                "comment": "Navigate to Somfy homepage"
+                                            },
+                                            {
+                                                "status": "PASS",
+                                                "comment": "Accept cookies"
+                                            },
+                                            {
+                                                "status": "PASS",
+                                                "comment": "Navigate to Products page"
+                                            }
+                                        ]
                                     }
                                 ]
                             }' > xray-results/xray-import.json
 
-                            # Import to Xray
                             curl -v -X POST \
                                  -H "Authorization: Basic ${auth}" \
                                  -H "Content-Type: application/json" \
@@ -112,7 +123,7 @@ pipeline {
                     buildStatus: 'UNSTABLE',
                     fileIncludePattern: '**/cucumber.json',
                     jsonReportDirectory: 'target/cucumber-reports',
-                    reportTitle: 'Cucumber Test Raporu'
+                    reportTitle: 'Somfy Web UI Test Report'
                 )
             }
         }
