@@ -53,7 +53,9 @@ pipeline {
                 )]) {
                     script {
                         def auth = sh(
-                            script: "echo -n '$JIRA_USER:$JIRA_TOKEN' | base64",
+                            script: '''#!/bin/bash
+                                echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64
+                            ''',
                             returnStdout: true
                         ).trim()
                         
@@ -75,6 +77,7 @@ pipeline {
                                         "testKey": "SMF-2",
                                         "comment": "Cookie acceptance and navigation test",
                                         "status": "PASS",
+                                        "evidence": "Test executed successfully",
                                         "steps": [
                                             {
                                                 "status": "PASS",
@@ -93,12 +96,20 @@ pipeline {
                                 ]
                             }' > xray-results/xray-import.json
 
+                            echo "Using Authorization: Basic ${auth}"
+                            
                             curl -v -X POST \
                                  -H "Authorization: Basic ${auth}" \
                                  -H "Content-Type: application/json" \
                                  -H "Accept: application/json" \
                                  --data @xray-results/xray-import.json \
-                                 "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution" | tee xray-response.log
+                                 "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution" 2>&1 | tee xray-response.log
+                            
+                            if [ \$? -ne 0 ]; then
+                                echo "Error: Xray API call failed"
+                                cat xray-response.log
+                                exit 1
+                            fi
                         """
                         
                         archiveArtifacts artifacts: 'xray-results/*.json,*.log', allowEmptyArchive: true
