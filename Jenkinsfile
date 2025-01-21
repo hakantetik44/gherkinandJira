@@ -43,8 +43,6 @@ pipeline {
         stage('Update Xray Test Results') {
             steps {
                 script {
-                    def testsPassed = fileExists 'target/cucumber-reports/cucumber.json'
-                    
                     withCredentials([usernamePassword(
                         credentialsId: 'jira-api',
                         usernameVariable: 'JIRA_USER',
@@ -56,34 +54,42 @@ pipeline {
                             AUTH=\$(cat auth.txt)
                             
                             # Start test execution
-                            curl -X PUT \\
+                            echo "Starting test execution..."
+                            START_RESPONSE=\$(curl -s -X PUT \\
                             -H "Authorization: Basic \$AUTH" \\
                             -H "Content-Type: application/json" \\
-                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
-                            -d '{"transition": {"id": "11"}}'
+                            "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
+                            -d '{"transition": {"id": "11"}}')
+                            echo "\$START_RESPONSE"
                             
                             # Import test results
                             if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                curl -X POST \\
+                                echo "Uploading test results..."
+                                IMPORT_RESPONSE=\$(curl -s -X POST \\
                                 -H "Authorization: Basic \$AUTH" \\
                                 -H "Content-Type: application/json" \\
                                 --data-binary @target/cucumber-reports/cucumber.json \\
-                                "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-2"
+                                "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber?projectKey=SMF2&testExecKey=SMF2-1")
+                                echo "\$IMPORT_RESPONSE"
                                 
-                                # Update status based on test results
-                                if [ \$? -eq 0 ]; then
-                                    curl -X PUT \\
+                                # Check if tests passed
+                                if grep -q '"status": "PASSED"' target/cucumber-reports/cucumber.json; then
+                                    echo "Tests passed, updating status to Done..."
+                                    curl -s -X PUT \\
                                     -H "Authorization: Basic \$AUTH" \\
                                     -H "Content-Type: application/json" \\
-                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
                                     -d '{"transition": {"id": "31"}}'
                                 else
-                                    curl -X PUT \\
+                                    echo "Tests failed, updating status to Failed..."
+                                    curl -s -X PUT \\
                                     -H "Authorization: Basic \$AUTH" \\
                                     -H "Content-Type: application/json" \\
-                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-2/transitions" \\
+                                    "https://somfycucumber.atlassian.net/rest/api/2/issue/SMF2-1/transitions" \\
                                     -d '{"transition": {"id": "41"}}'
                                 fi
+                            else
+                                echo "No test results found!"
                             fi
                             
                             rm auth.txt
