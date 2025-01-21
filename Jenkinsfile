@@ -46,37 +46,25 @@ pipeline {
 
         stage('Generate Xray Results') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'jira-credentials',
-                    usernameVariable: 'JIRA_USER',
-                    passwordVariable: 'JIRA_TOKEN'
-                )]) {
+                withCredentials([string(credentialsId: 'xray-api-key', variable: 'XRAY_API_KEY')]) {
                     script {
-                        def auth = sh(
-                            script: '''#!/bin/bash
-                                echo -n "${JIRA_USER}:${JIRA_TOKEN}" | base64
-                            ''',
-                            returnStdout: true
-                        ).trim()
-                        
                         sh """
-                            echo "Using auth: Basic ${auth}"
+                            echo "Uploading test results to Xray..."
                             
-                            if [ -f "target/cucumber-reports/cucumber.json" ]; then
-                                echo "Uploading test results..."
-                                curl -v -X POST \
-                                     -H "Authorization: Basic ${auth}" \
-                                     -H "Content-Type: application/json" \
-                                     -H "Accept: application/json" \
-                                     --data @target/cucumber-reports/cucumber.json \
-                                     "https://somfycucumber.atlassian.net/rest/raven/1.0/import/execution/cucumber" 2>&1 | tee xray-response.log
-                                
-                                echo "Xray response:"
-                                cat xray-response.log
-                            else
-                                echo "No cucumber.json file found!"
-                                exit 1
-                            fi
+                            # Debug için cucumber.json içeriğini göster
+                            echo "Cucumber JSON content:"
+                            cat target/cucumber-reports/cucumber.json
+                            
+                            # Test sonuçlarını Xray'e gönder
+                            curl -v -H "Content-Type: application/json" \
+                                 -H "Authorization: Bearer ${XRAY_API_KEY}" \
+                                 -X POST \
+                                 --data @target/cucumber-reports/cucumber.json \
+                                 "https://xray.cloud.getxray.app/api/v2/import/execution/cucumber" 2>&1 | tee xray-response.log
+                            
+                            # Xray yanıtını kontrol et
+                            echo "Xray response:"
+                            cat xray-response.log
                         """
                         
                         archiveArtifacts artifacts: 'xray-response.log', allowEmptyArchive: true
